@@ -216,9 +216,16 @@
 #include <errno.h>
 #include <float.h>
 #include <math.h>
+#if !defined(__AVR__)
 #include <signal.h>
+#endif
 #include <setjmp.h>
+#if defined(__AVR__)
+#   define __ASSERT_USE_STDERR
+#   define assert(x) do{if(!(x)){return -1;}}while(0);
+#else
 #include <assert.h>
+#endif
 
 //- System-specific include files -------------------------------------------
 

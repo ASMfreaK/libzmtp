@@ -17,7 +17,7 @@
 #include <Ethernet.h>
 #include <utility/w5100.h>
 #include <utility/socket.h>
-
+#include "zmtp_arduino_types.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

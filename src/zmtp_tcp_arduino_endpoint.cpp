@@ -16,7 +16,8 @@ extern "C" {
 #endif
 struct zmtp_tcp_endpoint {
     zmtp_endpoint_t base;
-    struct addrinfo *addrinfo;
+    char *addrinfo;
+    uint16_t port;
 };
 
 
@@ -29,25 +30,17 @@ zmtp_tcp_endpoint_new (const char *ip_addr, unsigned short port)
         return NULL;
 
     //  Initialize base class
-    self->base = (zmtp_endpoint_t) {
-        connect : (int (*) (zmtp_endpoint_t *)) zmtp_tcp_endpoint_connect,
-        listen : (int (*) (zmtp_endpoint_t *)) zmtp_tcp_endpoint_listen,
-        destroy : (void (*) (zmtp_endpoint_t **)) zmtp_tcp_endpoint_destroy,
-    };
-
-    //  Resolve address
-    const struct addrinfo hints = {
-        .ai_family   = AF_INET,
-        .ai_socktype = SOCK_STREAM,
-        .ai_flags    = AI_NUMERICHOST | AI_NUMERICSERV
-    };
-    char service [8 + 1];
-    snprintf (service, sizeof service, "%u", port);
-    if (getaddrinfo (ip_addr, service, &hints, &self->addrinfo)) {
-        free (self);
-        return NULL;
-    }
-
+    self->base.connect = (int (*) (zmtp_endpoint_t *)) zmtp_tcp_endpoint_connect;
+    self->base.listen = (int (*) (zmtp_endpoint_t *)) zmtp_tcp_endpoint_listen;
+    self->base.destroy = (void (*) (zmtp_endpoint_t **)) zmtp_tcp_endpoint_destroy;
+    // host resolving does not work
+    // FIXME: use DNSClient from Dns.h to get addr
+    // ip_addr is held in memory of callee,
+    // we don't need to hold of it on avr.
+    // IMPORTANT: ip_addr is a four-byte representaion of an ip,
+    //            it is NOT a string like "192.168.1.1"
+    self->addrinfo = ip_addr;
+    self->port = port;
     return self;
 }
 
@@ -58,7 +51,6 @@ zmtp_tcp_endpoint_destroy (zmtp_tcp_endpoint_t **self_p)
     assert (self_p);
     if (*self_p) {
         zmtp_tcp_endpoint_t *self = *self_p;
-        freeaddrinfo (self->addrinfo);
         free (self);
         *self_p = NULL;
     }
@@ -69,14 +61,15 @@ int
 zmtp_tcp_endpoint_connect (zmtp_tcp_endpoint_t *self)
 {
     assert (self);
-
-    const int s = socket (AF_INET, SOCK_STREAM, 0);
+    zmtp_tcp_endpoint_t *self_p = (zmtp_tcp_endpoint_t*) self;
+    const SOCKET s = get_sock_num();
     if (s == -1)
         return -1;
+    socket(s, SnMR::TCP, 0, 0);
 
     const int rc = connect (
-        s, self->addrinfo->ai_addr, self->addrinfo->ai_addrlen);
-    if (rc == -1) {
+      s, self_p->addrinfo, self_p->port);
+    if (rc == 0) {
         close (s);
         return -1;
     }
@@ -84,28 +77,34 @@ zmtp_tcp_endpoint_connect (zmtp_tcp_endpoint_t *self)
     return s;
 }
 
-int
+int16_t
 zmtp_tcp_endpoint_listen (zmtp_tcp_endpoint_t *self)
 {
     assert (self);
-
-    const int s = socket (AF_INET, SOCK_STREAM, 0);
+    zmtp_tcp_endpoint_t *self_p = (zmtp_tcp_endpoint_t*) self;
+    /*const int s = socket (AF_INET, SOCK_STREAM, 0);
+    if (s == -1)
+        return -1;*/
+    const SOCKET s = get_sock_num();
     if (s == -1)
         return -1;
-
-    const int flag = 1;
+    socket(s, SnMR::TCP, self_p->port, 0);
+    // can't set sock options on WS5100
+    /*const int flag = 1;
     int rc = setsockopt (s, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof flag);
-    assert (rc == 0);
+    assert (rc == 0);*/
 
-    rc = bind (
-        s, self->addrinfo->ai_addr, self->addrinfo->ai_addrlen);
-    if (rc == 0) {
-        rc = listen (s, 1);
-        if (rc == 0)
-            rc = accept (s, NULL, NULL);
+    // no bind on WS5100
+    /*rc = bind (
+        s, self->addrinfo, self->addrinfo->ai_addrlen);
+    if (rc == 0) {*/
+    uint8_t rc = listen(s); //WS5100 only listens to one at a time
+    if (rc == 1){
+        return s;
     }
-    close (s);
-    return rc;
+    close(s);
+    return -1;
+    // rc = accept (s, NULL, NULL); //WS5100 no accept
 }
 #ifdef __cplusplus
 }
