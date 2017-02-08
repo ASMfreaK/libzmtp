@@ -12,7 +12,7 @@
 
 #ifndef __ZMTP_IPC_ENDPOINT_H_INCLUDED__
 #define __ZMTP_IPC_ENDPOINT_H_INCLUDED__
-
+#if defined(hasipc)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,5 +32,5 @@ int
 
 int
     zmtp_ipc_endpoint_listen (zmtp_ipc_endpoint_t *self);
-
+#endif
 #endif

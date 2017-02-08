@@ -10,9 +10,14 @@
     =========================================================================
 */
 
-#ifndef __ZMTP_TCP_ENDPOINT_H_INCLUDED__
-#define __ZMTP_TCP_ENDPOINT_H_INCLUDED__
-#if defined(hasnormaltcp)
+#ifndef __ZMTP_TCP_ARDUINO_ENDPOINT_H_INCLUDED__
+#define __ZMTP_TCP_ARDUINO_ENDPOINT_H_INCLUDED__
+#if (defined(arduinotcp) && !defined(hasnormaltcp))
+#include <Arduino.h>
+#include <Ethernet.h>
+#include <utility/w5100.h>
+#include <utility/socket.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

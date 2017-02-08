@@ -12,7 +12,6 @@
 
 #ifndef __ZMTP_ENDPOINT_H_INCLUDED__
 #define __ZMTP_ENDPOINT_H_INCLUDED__
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,4 +33,7 @@ int
 int
     zmtp_endpoint_listen (zmtp_endpoint_t *self);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

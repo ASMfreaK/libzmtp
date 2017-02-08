@@ -15,12 +15,12 @@
 #define __ZBROKE_CLASSES_H_INCLUDED__
 
 //  External API
-#include "../include/zmtp.h"
+#include "zmtp.h"
 
 //  Internal API
 #include "zmtp_channel.h"
 #include "zmtp_endpoint.h"
 #include "zmtp_ipc_endpoint.h"
 #include "zmtp_tcp_endpoint.h"
-
+#include "zmtp_tcp_arduino_endpoint.h"
 #endif

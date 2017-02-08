@@ -425,6 +425,7 @@ s_tcp_recv (int fd, void *buffer, size_t len)
     return 0;
 }
 
+#ifndef __AVR__
 #include <poll.h>
 
 //  Simple TCP echo server. It listens on a TCP port and after
@@ -667,3 +668,4 @@ zmtp_channel_test (bool verbose)
     //  @end
     printf ("OK\n");
 }
+#endif

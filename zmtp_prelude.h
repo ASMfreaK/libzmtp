@@ -3,7 +3,7 @@
 
     Copyright (c) contributors as noted in the AUTHORS file.
     This file is part of libzmtp, the C ZMTP stack.
-    
+
     NOTE: this file is a subset of czmq_prelude.h, identical except for
     the last section that ties into libzmq. If you modify this file please
     consider backporting your patches to czmq_prelude.h.
@@ -200,7 +200,9 @@
 #elif (defined (__UNIX__))
 #   define __UTYPE_GENERIC
 #endif
-
+#if defined(__AVR__)
+#   define __UTYPE_AVR
+#endif
 //- Standard ANSI include files ---------------------------------------------
 
 #include <ctype.h>
@@ -362,7 +364,7 @@
 #if (USHRT_MAX != 0xFFFFU)
 #    error "Cannot compile: must change definition of 'dbyte'."
 #endif
-#if (UINT_MAX != 0xFFFFFFFFU)
+#if (ULONG_MAX != 0xFFFFFFFFU)
 #    error "Cannot compile: must change definition of 'qbyte'."
 #endif
 
@@ -370,7 +372,7 @@
 
 typedef unsigned char   byte;           //  Single unsigned byte = 8 bits
 typedef unsigned short  dbyte;          //  Double byte = 16 bits
-typedef unsigned int    qbyte;          //  Quad byte = 32 bits
+typedef uint32_t    qbyte;          //  Quad byte = 32 bits
 typedef struct sockaddr_in inaddr_t;    //  Internet socket address structure
 
 //- Inevitable macros -------------------------------------------------------
@@ -487,7 +489,9 @@ static inline void *
 #endif
 //  Lets us write code that compiles both on Windows and normal platforms
 #if !defined (__WINDOWS__)
+#   if !defined(__AVR__)
 typedef int SOCKET;
+#   endif
 #   define closesocket close
 #   define INVALID_SOCKET -1
 #   define SOCKET_ERROR -1
@@ -505,6 +509,12 @@ typedef int SOCKET;
 #   endif
 #else
 #   define ZMTP_EXPORT
+#endif
+
+#if defined(__AVR__)
+#   undef hasipc
+#   undef hasnormaltcp
+#   define arduinotcp
 #endif
 
 #endif
