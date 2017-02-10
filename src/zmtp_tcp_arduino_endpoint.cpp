@@ -56,16 +56,23 @@ zmtp_tcp_endpoint_destroy (zmtp_tcp_endpoint_t **self_p)
     }
 }
 
+#include <Arduino.h>
+int _srcport = 0;
 
 int
 zmtp_tcp_endpoint_connect (zmtp_tcp_endpoint_t *self)
 {
+    Serial.println("connect");
     assert (self);
     zmtp_tcp_endpoint_t *self_p = (zmtp_tcp_endpoint_t*) self;
     const SOCKET s = get_sock_num();
+    Serial.print("got sock # ");
+    Serial.println(s);
     if (s == -1)
         return -1;
-    socket(s, SnMR::TCP, 0, 0);
+    if (_srcport == 0) _srcport = 49152;
+
+    socket(s, SnMR::TCP, _srcport++, 0);
 
     const int rc = connect (
       s, self_p->addrinfo, self_p->port);
@@ -73,7 +80,14 @@ zmtp_tcp_endpoint_connect (zmtp_tcp_endpoint_t *self)
         close (s);
         return -1;
     }
-
+    while (socketStatus(s) != SnSR::ESTABLISHED) {
+       delay(1);
+       if (socketStatus(s) == SnSR::CLOSED) {
+         close(s);
+         return -1;
+       }
+    }
+    Serial.println("out of connect");
     return s;
 }
 

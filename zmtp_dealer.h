@@ -29,8 +29,10 @@ zmtp_dealer_t *
 void
     zmtp_dealer_destroy (zmtp_dealer_t **self_p);
 
+#if defined(hasipc)
 int
     zmtp_dealer_ipc_connect (zmtp_dealer_t *self, const char *addr);
+#endif
 
 int
     zmtp_dealer_tcp_connect (zmtp_dealer_t *self,

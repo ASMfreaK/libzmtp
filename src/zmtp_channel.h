@@ -16,7 +16,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 //  Definitions ZMTP/2.0 protocol flags.
 enum {
     ZMTP_MORE_FLAG = 1,
@@ -27,6 +26,18 @@ enum {
 //  Opaque class structure
 typedef struct _zmtp_channel_t zmtp_channel_t;
 
+typedef struct _zmtp_metadata_property{
+    uint8_t name_len;
+    char *name;
+    int32_t value_len;
+    uint8_t *value;
+} zmtp_metadata_property_t;
+
+typedef struct _zmtp_metadata{
+    zmtp_metadata_property_t** properties;
+    uint8_t properties_count;
+} zmtp_metadata_t;
+
 //  @interface
 //  Constructor
 zmtp_channel_t *
@@ -36,22 +47,34 @@ zmtp_channel_t *
 void
     zmtp_channel_destroy (zmtp_channel_t **self_p);
 
+#if defined(hasipc)
 //  Connect channel using local transport
 int
     zmtp_channel_ipc_connect (zmtp_channel_t *self, const char *path);
+#endif
 
 //  Connect channel using TCP transport.
 int
     zmtp_channel_tcp_connect (zmtp_channel_t *self,
-                              const char *addr, unsigned short port);
+                              const char *addr, unsigned short port,
+                              const zmtp_metadata_t* meta
+    );
 
 //  Connect channel
 int
-    zmtp_channel_connect (zmtp_channel_t *test, const char *endpoint_str);
+    zmtp_channel_connect (
+        zmtp_channel_t *test,
+        const char *endpoint_str,
+        const zmtp_metadata_t* meta
+    );
 
 //  Listen for new connection
 int
-    zmtp_channel_listen (zmtp_channel_t *test, const char *endpoint_str);
+    zmtp_channel_listen (
+        zmtp_channel_t *test,
+        const char *endpoint_str,
+        const zmtp_metadata_t* meta
+    );
 
 //  Send a ZMTP message to the channel
 int

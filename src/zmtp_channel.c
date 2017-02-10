@@ -10,6 +10,7 @@
     =========================================================================
 */
 
+#include <Arduino.h>
 #include "zmtp_classes.h"
 
 //  ZMTP greeting (64 bytes)
@@ -22,6 +23,8 @@ struct zmtp_greeting {
     byte filler [31];
 };
 
+
+
 //  Structure of our class
 
 struct _zmtp_channel_t {
@@ -31,7 +34,7 @@ struct _zmtp_channel_t {
 static zmtp_endpoint_t *
     s_endpoint_from_str (const char *endpoint_str);
 static int
-    s_negotiate (zmtp_channel_t *self);
+    s_negotiate (zmtp_channel_t *self, const zmtp_metadata_t* meta);
 static int
     s_tcp_send (int fd, const void *data, size_t len);
 static int
@@ -67,7 +70,7 @@ zmtp_channel_destroy (zmtp_channel_t **self_p)
     }
 }
 
-
+#if defined(hasipc)
 //  --------------------------------------------------------------------------
 //  Connect channel to local endpoint
 
@@ -97,14 +100,15 @@ zmtp_channel_ipc_connect (zmtp_channel_t *self, const char *path)
 
     return 0;
 }
-
+#endif
 
 //  --------------------------------------------------------------------------
 //  Connect channel to TCP endpoint
 
 int
 zmtp_channel_tcp_connect (zmtp_channel_t *self,
-                          const char *addr, unsigned short port)
+                          const char *addr, unsigned short port,
+                          const zmtp_metadata_t* meta)
 {
     assert (self);
 
@@ -121,7 +125,7 @@ zmtp_channel_tcp_connect (zmtp_channel_t *self,
     if (self->fd == -1)
         return -1;
 
-    if (s_negotiate (self) == -1) {
+    if (s_negotiate (self, meta) == -1) {
         close (self->fd);
         self->fd = -1;
         return -1;
@@ -135,7 +139,10 @@ zmtp_channel_tcp_connect (zmtp_channel_t *self,
 //  Connect channel
 
 int
-zmtp_channel_connect (zmtp_channel_t *self, const char *endpoint_str)
+zmtp_channel_connect (
+    zmtp_channel_t *self,
+    const char *endpoint_str,
+    const zmtp_metadata_t* meta)
 {
     assert (self);
 
@@ -151,7 +158,7 @@ zmtp_channel_connect (zmtp_channel_t *self, const char *endpoint_str)
     if (self->fd == -1)
         return -1;
 
-    if (s_negotiate (self) == -1) {
+    if (s_negotiate (self, meta) == -1) {
         close (self->fd);
         self->fd = -1;
         return -1;
@@ -165,7 +172,10 @@ zmtp_channel_connect (zmtp_channel_t *self, const char *endpoint_str)
 //  Connect channel
 
 int
-zmtp_channel_listen (zmtp_channel_t *self, const char *endpoint_str)
+zmtp_channel_listen (
+    zmtp_channel_t *self,
+    const char *endpoint_str,
+    const zmtp_metadata_t* meta)
 {
     assert (self);
 
@@ -181,7 +191,7 @@ zmtp_channel_listen (zmtp_channel_t *self, const char *endpoint_str)
     if (self->fd == -1)
         return -1;
 
-    if (s_negotiate (self) == -1) {
+    if (s_negotiate (self, meta) == -1) {
         close (self->fd);
         self->fd = -1;
         return -1;
@@ -193,10 +203,12 @@ zmtp_channel_listen (zmtp_channel_t *self, const char *endpoint_str)
 static zmtp_endpoint_t *
 s_endpoint_from_str (const char *endpoint_str)
 {
+#if defined(hasipc)
     if (strncmp (endpoint_str, "ipc://", 6) == 0)
         return (zmtp_endpoint_t *)
             zmtp_ipc_endpoint_new (endpoint_str + 6);
     else
+#endif
     if (strncmp (endpoint_str, "tcp://", 6) == 0) {
         char *colon = strrchr (endpoint_str + 6, ':');
         if (colon == NULL)
@@ -222,10 +234,18 @@ s_endpoint_from_str (const char *endpoint_str)
 //  TODO: test sending random/wrong data to this handler.
 
 static int
-s_negotiate (zmtp_channel_t *self)
+s_negotiate (zmtp_channel_t *self, const zmtp_metadata_t* meta)
 {
+    uint8_t ready_str[] = {'\5', 'R', 'E', 'A', 'D', 'Y'};
+    int i;
+    zmtp_msg_t *ready;
+    size_t bsize;
+    uint8_t* readybuffer;
+    uint8_t *pos1;
+    uint8_t *pos2;
     assert (self);
     assert (self->fd != -1);
+    assert (meta);
 
     const int s = self->fd;
 
@@ -279,7 +299,42 @@ s_negotiate (zmtp_channel_t *self)
         goto io_error;
 
     //  Send READY command
-    zmtp_msg_t *ready = zmtp_msg_from_const_data (0x04, "\5READY", 6);
+    bsize = 6;
+    for (i=0; i<meta->properties_count; i++){
+        zmtp_metadata_property_t* prop = meta->properties[i];
+        bsize += 1 + prop->name_len + 4 + prop->value_len;
+    }
+    readybuffer = (uint8_t*) zmalloc(bsize);
+    if(readybuffer == NULL)
+        goto io_error;
+    pos1 = readybuffer;
+    Serial.println((int)readybuffer);
+    for (int i=0; i<6; i++){
+        (*(pos1++)) = ready_str[i];
+    }
+    Serial.println((int)readybuffer);
+    for (i=0; i<meta->properties_count; i++){
+         int j;
+         zmtp_metadata_property_t* prop = meta->properties[i];
+         uint32_t value_len = prop->value_len;
+         (*(pos1++)) = prop->name_len;
+         pos2 = prop->name;
+         for(j=0; j<prop->name_len; j++)
+             (*(pos1++)) = *(pos2++);
+         (*(pos1++)) = (uint8_t) value_len >> 24;
+         *(pos1++) = (uint8_t) value_len >> 16;
+         *(pos1++) = (uint8_t) value_len >> 8;
+         *(pos1++) = (uint8_t) value_len;
+         pos2 = prop->value;
+         for(j=0; j<value_len; j++)
+             *(pos1++) = *(pos2++);
+    }
+    for (i=0; i<bsize; i++){
+        Serial.print(readybuffer[i]);
+        Serial.print(' ');
+    }
+    Serial.println();
+    ready = zmtp_msg_from_data (0x04, &readybuffer, bsize);
     assert (ready);
     zmtp_channel_send (self, ready);
     zmtp_msg_destroy (&ready);
@@ -289,6 +344,9 @@ s_negotiate (zmtp_channel_t *self)
     if (!ready)
         goto io_error;
     assert ((zmtp_msg_flags (ready) & ZMTP_MSG_COMMAND) == ZMTP_MSG_COMMAND);
+    Serial.print("inmsg size ");
+    Serial.println(zmtp_msg_size(ready));
+    Serial.write(zmtp_msg_data(ready), zmtp_msg_size(ready));
     zmtp_msg_destroy (&ready);
 
     return 0;
@@ -375,6 +433,8 @@ zmtp_channel_recv (zmtp_channel_t *self)
                (uint64_t) buffer [6] << 8  |
                (uint64_t) buffer [7];
     }
+    Serial.print("Message size");
+    Serial.println(size);
     byte *data = zmalloc (size);
     assert (data);
     if (s_tcp_recv (self->fd, data, size) == -1) {
@@ -397,15 +457,34 @@ static int
 s_tcp_send (int fd, const void *data, size_t len)
 {
     size_t bytes_sent = 0;
+#if !defined(__AVR__)
     while (bytes_sent < len) {
         const ssize_t rc = send (
-            fd, (char *) data + bytes_sent, len - bytes_sent, 0);
+            fd,(char *) data + bytes_sent,
+            len - bytes_sent, 0
+        );
         if (rc == -1 && errno == EINTR)
             continue;
         if (rc == -1)
             return -1;
         bytes_sent += rc;
     }
+#else
+    Serial.println("send");
+    while (bytes_sent < len) {
+        const ssize_t rc = send (
+            fd, (char *) data + bytes_sent,
+            len - bytes_sent
+          );
+        Serial.print("send rc ");
+        Serial.println(rc);
+        if (rc == -1)
+            continue;
+        if (rc == 0)
+            return -1;
+        bytes_sent += rc;
+    }
+#endif
     return 0;
 }
 
@@ -413,13 +492,28 @@ static int
 s_tcp_recv (int fd, void *buffer, size_t len)
 {
     size_t bytes_read = 0;
+    Serial.println("recv");
     while (bytes_read < len) {
         const ssize_t n = recv (
-            fd, (char *) buffer + bytes_read, len - bytes_read, 0);
+            fd,
+            (char *) buffer + bytes_read, len - bytes_read
+#if !defined(__AVR__)
+            , 0
+#endif
+          );
+#if !defined(__AVR__)
         if (n == -1 && errno == EINTR)
             continue;
         if (n == -1 || n == 0)
             return -1;
+#else
+        Serial.print("recv n ");
+        Serial.println(n);
+        if (n == -1)
+            continue;
+        if (n == 0)
+            return -1;
+#endif
         bytes_read += n;
     }
     return 0;
@@ -444,37 +538,37 @@ s_echo_serv (void *arg)
     //  Create socket
     const int s = socket (AF_INET, SOCK_STREAM, 0);
     assert (s != -1);
-    
+
     //  Allow port reuse
     const int on = 1;
     int rc = setsockopt (s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof on);
     assert (rc == 0);
-    
+
     //  Fill address
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons (params->port);
     server_addr.sin_addr.s_addr = htonl (INADDR_ANY);
-    
+
     //  Bind socket
     rc = bind (s, (struct sockaddr *) &server_addr, sizeof server_addr);
     assert (rc == 0);
-    
+
     //  Listen for connections
     rc = listen (s, 1);
     assert (rc != -1);
-    
+
     //  Accept connection
     int fd = accept (s, NULL, NULL);
     assert (fd != -1);
-    
+
     //  Set non-blocking mode
     const int flags = fcntl (fd, F_GETFL, 0);
     assert (flags != -1);
     rc = fcntl (fd, F_SETFL, flags | O_NONBLOCK);
     assert (rc == 0);
     unsigned char buf [80];
-    
+
     //  Echo all received data
     while (1) {
         struct pollfd pollfd;
@@ -582,7 +676,7 @@ zmtp_channel_test (bool verbose)
         "4444",
         "55555"
     };
-        
+
     for (int i = 0; i < 5; i++) {
         zmtp_msg_t *msg = zmtp_msg_from_const_data (
             0, test_strings [i], strlen (test_strings [i]));

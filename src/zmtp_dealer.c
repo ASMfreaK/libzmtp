@@ -49,7 +49,7 @@ zmtp_dealer_destroy (zmtp_dealer_t **self_p)
     }
 }
 
-
+#if defined(hasipc)
 //  --------------------------------------------------------------------------
 //
 
@@ -63,7 +63,7 @@ zmtp_dealer_ipc_connect (zmtp_dealer_t *self, const char *path)
     //  Create new channel if possible
     self->channel = zmtp_channel_new ();
     if (!self->channel)
-        return -1;   
+        return -1;
 
     //  Try to connect channel to specified endpoint
     if (zmtp_channel_ipc_connect (self->channel, path) == -1) {
@@ -72,7 +72,7 @@ zmtp_dealer_ipc_connect (zmtp_dealer_t *self, const char *path)
     }
     return 0;
 }
-
+#endif
 
 //  --------------------------------------------------------------------------
 //
@@ -84,14 +84,30 @@ zmtp_dealer_tcp_connect (zmtp_dealer_t *self,
     assert (self);
     if (self->channel)  //  At most one channel per socket now
         return -1;
-    
+
     //  Create new channel if possible
     self->channel = zmtp_channel_new ();
     if (!self->channel)
         return -1;
-    
+    zmtp_metadata_property_t st = {
+        .name_len=11,
+        .name="Socket-Type",
+        .value_len=6,
+        .value="DEALER"
+    };
+    zmtp_metadata_property_t id = {
+        .name_len=8,
+        .name="Identity",
+        .value_len=0,
+        .value=""
+    };
+    zmtp_metadata_property_t* props[] = {&st, &id};
+    zmtp_metadata_t meta = {
+        .properties=props,
+        .properties_count=2
+    };
     //  Try to connect channel to specified endpoint
-    if (zmtp_channel_tcp_connect (self->channel, addr, port) == -1) {
+    if (zmtp_channel_tcp_connect (self->channel, addr, port, &meta) == -1) {
         zmtp_channel_destroy (&self->channel);
         return -1;
     }
@@ -113,9 +129,25 @@ zmtp_dealer_connect (zmtp_dealer_t *self, const char *endpoint_str)
     self->channel = zmtp_channel_new ();
     if (!self->channel)
         return -1;
-
+    zmtp_metadata_property_t st = {
+        .name_len=11,
+        .name="Socket-Type",
+        .value_len=6,
+        .value="DEALER"
+    };
+    zmtp_metadata_property_t id = {
+        .name_len=8,
+        .name="Identity",
+        .value_len=0,
+        .value=""
+    };
+    zmtp_metadata_property_t* props[] = {&st, &id};
+    zmtp_metadata_t meta = {
+        .properties=props,
+        .properties_count=2
+    };
     //  Try to connect channel to specified endpoint
-    if (zmtp_channel_connect (self->channel, endpoint_str) == -1) {
+    if (zmtp_channel_connect (self->channel, endpoint_str, &meta) == -1) {
         zmtp_channel_destroy (&self->channel);
         return -1;
     }
@@ -138,7 +170,24 @@ zmtp_dealer_listen (zmtp_dealer_t *self, const char *endpoint_str)
         return -1;
 
     //  Try to connect channel to specified endpoint
-    if (zmtp_channel_listen (self->channel, endpoint_str) == -1) {
+    zmtp_metadata_property_t st = {
+        .name_len=11,
+        .name="Socket-Type",
+        .value_len=6,
+        .value="DEALER"
+    };
+    zmtp_metadata_property_t id = {
+        .name_len=8,
+        .name="Identity",
+        .value_len=0,
+        .value=""
+    };
+    zmtp_metadata_property_t* props[] = {&st, &id};
+    zmtp_metadata_t meta = {
+        .properties=props,
+        .properties_count=2
+    };
+    if (zmtp_channel_listen (self->channel, endpoint_str, &meta) == -1) {
         zmtp_channel_destroy (&self->channel);
         return -1;
     }
@@ -154,7 +203,7 @@ zmtp_dealer_send (zmtp_dealer_t *self, zmtp_msg_t *msg)
     assert (self);
     if (!self->channel)
         return -1;
-    
+
     return zmtp_channel_send (self->channel, msg);
 }
 
@@ -168,7 +217,7 @@ zmtp_dealer_recv (zmtp_dealer_t *self)
     assert (self);
     if (!self->channel)
         return NULL;
-    
+
     return zmtp_channel_recv (self->channel);
 }
 

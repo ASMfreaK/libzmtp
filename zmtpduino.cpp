@@ -11,6 +11,6 @@
 #   include "src/zmtp_tcp_endpoint.c"
 #endif
 
-//#include "src/zmtp_channel.c"
+#include "src/zmtp_channel.c"
 
-//#include "src/zmtp_dealer.c"
+#include "src/zmtp_dealer.c"

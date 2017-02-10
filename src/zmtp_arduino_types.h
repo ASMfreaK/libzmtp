@@ -5,7 +5,7 @@
 #include <utility/socket.h>
 typedef int16_t ssize_t;
 int16_t get_sock_num(){
-  for(int16_t i=0; i++; i<MAX_SOCK_NUM){
+  for(int16_t i=0; i<MAX_SOCK_NUM; i++){
     uint8_t st = socketStatus(i);
     if(st==SnSR::CLOSED){
       return i;
