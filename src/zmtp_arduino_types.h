@@ -3,16 +3,17 @@
 #if defined(__AVR__)
 #include <utility/w5100.h>
 #include <utility/socket.h>
-typedef int16_t ssize_t;
-int16_t get_sock_num(){
-  for(int16_t i=0; i<MAX_SOCK_NUM; i++){
-    uint8_t st = socketStatus(i);
-    if(st==SnSR::CLOSED){
-      return i;
-    }
-  }
-  return -1;
-}
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+typedef int16_t ssize_t;
+int16_t arduino_get_sock_num();
+int accept(SOCKET s);
+
+
+#ifdef __cplusplus
+}
+#endif
 #endif
 #endif

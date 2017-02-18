@@ -75,7 +75,12 @@ int
         const char *endpoint_str,
         const zmtp_metadata_t* meta
     );
-
+int
+    zmtp_channel_tcp_listen (
+        zmtp_channel_t *self,
+        const char *addr, unsigned short port,
+        const zmtp_metadata_t* meta
+    );
 //  Send a ZMTP message to the channel
 int
     zmtp_channel_send (zmtp_channel_t *self, zmtp_msg_t *msg);

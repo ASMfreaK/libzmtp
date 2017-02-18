@@ -120,7 +120,7 @@ zmtp_channel_tcp_connect (zmtp_channel_t *self,
     if (endpoint == NULL)
         return -1;
 
-    self->fd = zmtp_endpoint_connect (endpoint);
+    self->fd = zmtp_endpoint_listen (endpoint);
     zmtp_endpoint_destroy (&endpoint);
     if (self->fd == -1)
         return -1;
@@ -168,8 +168,33 @@ zmtp_channel_connect (
 }
 
 
-//  --------------------------------------------------------------------------
-//  Connect channel
+int
+zmtp_channel_tcp_listen (zmtp_channel_t *self,
+                          const char *addr, unsigned short port,
+                          const zmtp_metadata_t* meta)
+{
+    assert (self);
+
+    if (self->fd != -1)
+        return -1;
+
+    zmtp_endpoint_t *endpoint =
+        (zmtp_endpoint_t *) zmtp_tcp_endpoint_new (addr, port);
+    if (endpoint == NULL)
+        return -1;
+    Serial.println("into listen");
+    self->fd = zmtp_endpoint_listen (endpoint);
+    zmtp_endpoint_destroy (&endpoint);
+    if (self->fd == -1)
+        return -1;
+    Serial.println("into negotiate");
+    if (s_negotiate (self, meta) == -1) {
+        close (self->fd);
+        self->fd = -1;
+        return -1;
+    }
+    return 0;
+}
 
 int
 zmtp_channel_listen (
@@ -308,11 +333,9 @@ s_negotiate (zmtp_channel_t *self, const zmtp_metadata_t* meta)
     if(readybuffer == NULL)
         goto io_error;
     pos1 = readybuffer;
-    Serial.println((int)readybuffer);
     for (int i=0; i<6; i++){
         (*(pos1++)) = ready_str[i];
     }
-    Serial.println((int)readybuffer);
     for (i=0; i<meta->properties_count; i++){
          int j;
          zmtp_metadata_property_t* prop = meta->properties[i];
@@ -329,11 +352,6 @@ s_negotiate (zmtp_channel_t *self, const zmtp_metadata_t* meta)
          for(j=0; j<value_len; j++)
              *(pos1++) = *(pos2++);
     }
-    for (i=0; i<bsize; i++){
-        Serial.print(readybuffer[i]);
-        Serial.print(' ');
-    }
-    Serial.println();
     ready = zmtp_msg_from_data (0x04, &readybuffer, bsize);
     assert (ready);
     zmtp_channel_send (self, ready);
@@ -344,9 +362,6 @@ s_negotiate (zmtp_channel_t *self, const zmtp_metadata_t* meta)
     if (!ready)
         goto io_error;
     assert ((zmtp_msg_flags (ready) & ZMTP_MSG_COMMAND) == ZMTP_MSG_COMMAND);
-    Serial.print("inmsg size ");
-    Serial.println(zmtp_msg_size(ready));
-    Serial.write(zmtp_msg_data(ready), zmtp_msg_size(ready));
     zmtp_msg_destroy (&ready);
 
     return 0;
@@ -433,8 +448,6 @@ zmtp_channel_recv (zmtp_channel_t *self)
                (uint64_t) buffer [6] << 8  |
                (uint64_t) buffer [7];
     }
-    Serial.print("Message size");
-    Serial.println(size);
     byte *data = zmalloc (size);
     assert (data);
     if (s_tcp_recv (self->fd, data, size) == -1) {
@@ -470,14 +483,11 @@ s_tcp_send (int fd, const void *data, size_t len)
         bytes_sent += rc;
     }
 #else
-    Serial.println("send");
     while (bytes_sent < len) {
         const ssize_t rc = send (
             fd, (char *) data + bytes_sent,
             len - bytes_sent
           );
-        Serial.print("send rc ");
-        Serial.println(rc);
         if (rc == -1)
             continue;
         if (rc == 0)
@@ -492,7 +502,6 @@ static int
 s_tcp_recv (int fd, void *buffer, size_t len)
 {
     size_t bytes_read = 0;
-    Serial.println("recv");
     while (bytes_read < len) {
         const ssize_t n = recv (
             fd,
@@ -507,8 +516,6 @@ s_tcp_recv (int fd, void *buffer, size_t len)
         if (n == -1 || n == 0)
             return -1;
 #else
-        Serial.print("recv n ");
-        Serial.println(n);
         if (n == -1)
             continue;
         if (n == 0)

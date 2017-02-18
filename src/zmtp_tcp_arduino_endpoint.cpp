@@ -62,12 +62,9 @@ int _srcport = 0;
 int
 zmtp_tcp_endpoint_connect (zmtp_tcp_endpoint_t *self)
 {
-    Serial.println("connect");
     assert (self);
     zmtp_tcp_endpoint_t *self_p = (zmtp_tcp_endpoint_t*) self;
-    const SOCKET s = get_sock_num();
-    Serial.print("got sock # ");
-    Serial.println(s);
+    const SOCKET s = arduino_get_sock_num();
     if (s == -1)
         return -1;
     if (_srcport == 0) _srcport = 49152;
@@ -87,7 +84,6 @@ zmtp_tcp_endpoint_connect (zmtp_tcp_endpoint_t *self)
          return -1;
        }
     }
-    Serial.println("out of connect");
     return s;
 }
 
@@ -99,26 +95,30 @@ zmtp_tcp_endpoint_listen (zmtp_tcp_endpoint_t *self)
     /*const int s = socket (AF_INET, SOCK_STREAM, 0);
     if (s == -1)
         return -1;*/
-    const SOCKET s = get_sock_num();
+    const SOCKET s = arduino_get_sock_num();
     if (s == -1)
         return -1;
     socket(s, SnMR::TCP, self_p->port, 0);
-    // can't set sock options on WS5100
+    // can't set sock options on W5100
     /*const int flag = 1;
     int rc = setsockopt (s, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof flag);
     assert (rc == 0);*/
 
-    // no bind on WS5100
+    // no bind on W5100
     /*rc = bind (
         s, self->addrinfo, self->addrinfo->ai_addrlen);
     if (rc == 0) {*/
     uint8_t rc = listen(s); //WS5100 only listens to one at a time
     if (rc == 1){
-        return s;
+        rc = accept (s);
+        if (rc == 1){
+            return s;
+        }
     }
     close(s);
     return -1;
-    // rc = accept (s, NULL, NULL); //WS5100 no accept
+    // rc = accept (s, NULL, NULL);
+    //W5100 no accept, we have to use multpliple sockets.
 }
 #ifdef __cplusplus
 }

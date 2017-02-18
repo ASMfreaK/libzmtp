@@ -17,11 +17,10 @@
 #include <Ethernet.h>
 #include <utility/w5100.h>
 #include <utility/socket.h>
-#include "zmtp_arduino_types.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+#include "zmtp_arduino_types.h"
 #include "zmtp_endpoint.h"
 
 typedef struct zmtp_tcp_endpoint zmtp_tcp_endpoint_t;

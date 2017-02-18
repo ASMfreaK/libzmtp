@@ -5,6 +5,7 @@
 #include "src/zmtp_classes.h"
 
 #if defined(arduinotcp)
+#   include "src/zmtp_arduino_types.c"
 #   include "src/zmtp_tcp_arduino_endpoint.cpp"
 #endif
 #if defined(hasnormaltcp)
